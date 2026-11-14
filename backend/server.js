@@ -252,6 +252,7 @@ app.post("/api/mask", async (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
+  
   try {
     await connectDB();
 

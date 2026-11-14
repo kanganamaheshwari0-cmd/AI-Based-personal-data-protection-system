@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 
 const scanSchema = new mongoose.Schema(
+  
   {
     originalTextEncrypted: {
       type: String,

@@ -7,14 +7,22 @@ const scanSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+
     maskedText: {
       type: String,
       required: true
     },
+
+    encryptedMapping: {
+      type: String,
+      required: true
+    },
+
     totalMasked: {
       type: Number,
       default: 0
     },
+
     detections: [
       {
         type: {
@@ -27,6 +35,7 @@ const scanSchema = new mongoose.Schema(
         }
       }
     ],
+
     privacyScore: {
       type: Number,
       default: 100

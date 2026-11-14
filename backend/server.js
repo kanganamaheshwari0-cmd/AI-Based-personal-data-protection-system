@@ -22,7 +22,8 @@ if (!ENCRYPTION_KEY || !/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY)) {
   );
 }
 
-// AES-256-GCM Encryption
+// AES-256-GCM ENCRYPTION
+
 function encryptText(text) {
   const iv = crypto.randomBytes(12);
 
@@ -150,14 +151,18 @@ app.post("/api/mask", async (req, res) => {
 
     const result = await aiResponse.json();
 
-    // Step 2: Validate detection positions
+    // Step 2: Sort detections by starting position
 
     const detections = [...result.detections].sort(
-      (a, b) => b.start - a.start
+      (a, b) => a.start - b.start
     );
 
-    let maskedText = text;
+    const mapping = {};
     const maskedDetections = [];
+
+    // Step 3: Validate and create placeholder mapping
+
+    let previousEnd = -1;
 
     for (let index = 0; index < detections.length; index++) {
       const item = detections[index];
@@ -167,40 +172,61 @@ app.post("/api/mask", async (req, res) => {
         !Number.isInteger(item.end) ||
         item.start < 0 ||
         item.end <= item.start ||
-        item.end > text.length
+        item.end > text.length ||
+        item.start < previousEnd ||
+        typeof item.value !== "string" ||
+        text.substring(item.start, item.end) !== item.value
       ) {
-        throw new Error("Invalid detection positions");
+        throw new Error("Invalid or overlapping detection positions");
       }
 
-      const placeholder =
-        `[${item.type}_${detections.length - index}]`;
+      const placeholder = `[${item.type}_${index + 1}]`;
 
-      maskedText =
-        maskedText.substring(0, item.start) +
-        placeholder +
-        maskedText.substring(item.end);
+      // Original value mapped to its placeholder
+      mapping[placeholder] = item.value;
 
       maskedDetections.push({
         type: item.type,
         placeholder
       });
+
+      previousEnd = item.end;
     }
 
-    // Step 3: Encrypt original text
+    // Step 4: Apply masking from right to left
+
+    let maskedText = text;
+
+    for (let index = detections.length - 1; index >= 0; index--) {
+      const item = detections[index];
+      const placeholder = `[${item.type}_${index + 1}]`;
+
+      maskedText =
+        maskedText.substring(0, item.start) +
+        placeholder +
+        maskedText.substring(item.end);
+    }
+
+    // Step 5: Encrypt original text and mapping
 
     const encryptedOriginalText = encryptText(text);
 
-    // Step 4: Save encrypted data in MongoDB
+    const encryptedMapping = encryptText(
+      JSON.stringify(mapping)
+    );
+
+    // Step 6: Save data in MongoDB
 
     const savedScan = await Scan.create({
       originalTextEncrypted: encryptedOriginalText,
+      encryptedMapping: encryptedMapping,
       maskedText: maskedText,
       totalMasked: maskedDetections.length,
       detections: maskedDetections,
       privacyScore: result.privacy_score ?? 100
     });
 
-    // Step 5: Send response
+    // Step 7: Send response
 
     return res.status(201).json({
       success: true,
@@ -222,7 +248,6 @@ app.post("/api/mask", async (req, res) => {
 });
 
 // START SERVER
-
 
 const PORT = process.env.PORT || 5000;
 

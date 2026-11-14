@@ -1,7 +1,6 @@
 
 import re
 
-
 # Patterns for detecting sensitive information
 PATTERNS = {
     "EMAIL": re.compile(
@@ -19,6 +18,15 @@ PATTERNS = {
     "PIN_CODE": re.compile(
         r"(?<!\d)[1-9]\d{5}(?!\d)"
     ),
+
+    # "PERSON": re.compile(
+    #     r"\b(?:my name is|I am|this is)\s+([A-Z][a-z]+)\b"
+    # )
+
+    "PERSON": re.compile(
+    r"\b(?:my name is|I am|this is)\s+([A-Z][a-z]+)\b",
+    re.IGNORECASE
+)
 }
 
 
@@ -35,14 +43,24 @@ def detect_sensitive_data(text):
 
     for data_type, pattern in PATTERNS.items():
         for match in pattern.finditer(text):
+
+            # PERSON pattern captures only the name
+            if data_type == "PERSON":
+                value = match.group(1)
+                start = match.start(1)
+                end = match.end(1)
+            else:
+                value = match.group()
+                start = match.start()
+                end = match.end()
+
             detections.append({
                 "type": data_type,
-                "value": match.group(),
-                "start": match.start(),
-                "end": match.end()
+                "value": value,
+                "start": start,
+                "end": end
             })
 
-    # Sort detections by their starting position
     detections.sort(key=lambda item: item["start"])
 
     return detections
@@ -58,7 +76,8 @@ def calculate_privacy_score(detections):
         "EMAIL": 15,
         "PHONE": 20,
         "AADHAAR": 30,
-        "PIN_CODE": 10
+        "PIN_CODE": 10,
+        "PERSON": 10
     }
 
     total_risk = sum(
